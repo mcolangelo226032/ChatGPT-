@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Puzzle Playground</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f0f0f0; }
+        header { background: #333; color: #fff; padding: 20px; text-align: center; }
+        #puzzle-list { list-style: none; padding: 0; margin: 20px; display: flex; flex-wrap: wrap; }
+        #puzzle-list li { background: #fff; border: 1px solid #ccc; margin: 10px; padding: 20px; width: calc(50% - 40px); cursor: pointer; }
+        #puzzle-container { display: none; margin: 20px; background: #fff; padding: 20px; border: 1px solid #ccc; }
+        .hidden { display: none; }
+        button { margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Puzzle Playground</h1>
+    </header>
+    <ul id="puzzle-list">
+        <li data-id="0">Puzzle 1</li>
+        <li data-id="1">Puzzle 2</li>
+        <li data-id="2">Puzzle 3</li>
+        <li data-id="3">Puzzle 4</li>
+        <li data-id="4">Puzzle 5</li>
+        <li data-id="5">Puzzle 6</li>
+        <li data-id="6">Puzzle 7</li>
+        <li data-id="7">Puzzle 8</li>
+        <li data-id="8">Puzzle 9</li>
+        <li data-id="9">Puzzle 10</li>
+    </ul>
+
+    <div id="puzzle-container">
+        <h2 id="puzzle-title"></h2>
+        <p id="puzzle-question"></p>
+        <input type="text" id="puzzle-answer" placeholder="Your answer here">
+        <button id="check-answer">Check Answer</button>
+        <p id="result" class="hidden"></p>
+        <button id="back">Back to List</button>
+    </div>
+
+    <script>
+        const puzzles = [
+            { question: "What is the next number in the sequence? 2, 4, 8, 16, __?", answer: "32" },
+            { question: "What word becomes shorter when you add two letters to it?", answer: "short" },
+            { question: "I have keys but no locks and space but no rooms. What am I?", answer: "keyboard" },
+            { question: "What has hands but can't clap?", answer: "clock" },
+            { question: "How many months have 28 days?", answer: "12" },
+            { question: "What gets wetter the more it dries?", answer: "towel" },
+            { question: "Forward I am heavy, backward I am not. What am I?", answer: "ton" },
+            { question: "What begins with T, ends with T, and has T in it?", answer: "teapot" },
+            { question: "What can travel around the world while staying in a corner?", answer: "stamp" },
+            { question: "What has an eye but cannot see?", answer: "needle" }
+        ];
+
+        const puzzleList = document.getElementById('puzzle-list');
+        const container = document.getElementById('puzzle-container');
+        const titleEl = document.getElementById('puzzle-title');
+        const questionEl = document.getElementById('puzzle-question');
+        const answerInput = document.getElementById('puzzle-answer');
+        const resultEl = document.getElementById('result');
+        const checkBtn = document.getElementById('check-answer');
+        const backBtn = document.getElementById('back');
+
+        puzzleList.addEventListener('click', (e) => {
+            if (e.target.tagName.toLowerCase() === 'li') {
+                const id = e.target.getAttribute('data-id');
+                loadPuzzle(id);
+            }
+        });
+
+        checkBtn.addEventListener('click', () => {
+            const currentId = container.getAttribute('data-current');
+            const puzzle = puzzles[currentId];
+            const userAnswer = answerInput.value.trim().toLowerCase();
+            if (userAnswer === puzzle.answer) {
+                resultEl.textContent = 'Correct!';
+                resultEl.style.color = 'green';
+            } else {
+                resultEl.textContent = 'Try again!';
+                resultEl.style.color = 'red';
+            }
+            resultEl.classList.remove('hidden');
+        });
+
+        backBtn.addEventListener('click', () => {
+            container.style.display = 'none';
+            puzzleList.style.display = 'flex';
+            resultEl.classList.add('hidden');
+            answerInput.value = '';
+        });
+
+        function loadPuzzle(id) {
+            const puzzle = puzzles[id];
+            container.setAttribute('data-current', id);
+            titleEl.textContent = `Puzzle ${parseInt(id) + 1}`;
+            questionEl.textContent = puzzle.question;
+            puzzleList.style.display = 'none';
+            container.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
