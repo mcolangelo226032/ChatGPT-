@@ -20,6 +20,12 @@
         const ai = { x: canvas.width - paddleWidth - 10, y: canvas.height / 2 - paddleHeight / 2 };
         const ball = { x: canvas.width / 2, y: canvas.height / 2, radius: 7, speedX: 4, speedY: 4 };
 
+        // player paddle movement via mouse
+        canvas.addEventListener('mousemove', e => {
+            let rect = canvas.getBoundingClientRect();
+            player.y = e.clientY - rect.top - paddleHeight / 2;
+        });
+
         function drawRect(x, y, w, h, color) {
             ctx.fillStyle = color;
             ctx.fillRect(x, y, w, h);
@@ -48,12 +54,6 @@
             if (ball.y + ball.radius > canvas.height || ball.y - ball.radius < 0) {
                 ball.speedY = -ball.speedY;
             }
-
-            // player paddle movement via mouse
-            canvas.addEventListener('mousemove', e => {
-                let rect = canvas.getBoundingClientRect();
-                player.y = e.clientY - rect.top - paddleHeight / 2;
-            });
 
             // AI paddle movement
             ai.y += (ball.y - (ai.y + paddleHeight / 2)) * 0.05;
