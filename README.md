@@ -1,5 +1,8 @@
-# ChatGPT- Pong Game
+# ChatGPT - Games Collection
 
-This repository contains a simple recreation of the classic Pong game using HTML5 and JavaScript. To play it locally, open [`pong/index.html`](./pong/index.html) in your web browser.
+This repository contains simple browser-based games and puzzles built with HTML and JavaScript.
 
-You can also view the raw file directly once the repository is hosted on GitHub by navigating to the HTML file and selecting **Raw**. The game runs entirely in your browser.
+- **Pong Game** – a recreation of the classic arcade game. Open [`pong/index.html`](./pong/index.html) in your web browser to play.
+- **Puzzle Playground** – an interactive website offering ten short riddles to solve. Open [`puzzles/index.html`](./puzzles/index.html) to try them out.
+
+All games run entirely in your browser once the HTML files are opened.
