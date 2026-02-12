@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Photo Timelapse Stabilizer</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #111827;
+      --panel: #1f2937;
+      --panel-soft: #111827;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --accent: #60a5fa;
+      --accent-2: #34d399;
+      --danger: #f87171;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at top, #1f2937 0%, #0b1120 70%);
+      color: var(--text);
+      font: 16px/1.5 Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+
+    main {
+      width: min(1100px, 95vw);
+      margin: 2rem auto;
+      display: grid;
+      gap: 1rem;
+    }
+
+    .card {
+      background: color-mix(in srgb, var(--panel), black 15%);
+      border: 1px solid #374151;
+      border-radius: 14px;
+      padding: 1rem;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+    }
+
+    h1, h2 { margin: 0 0 .5rem; }
+    p { margin: .25rem 0; color: var(--muted); }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: .75rem;
+      align-items: end;
+    }
+
+    label { display: grid; gap: .35rem; font-size: .95rem; }
+
+    input[type="file"], input[type="number"], button {
+      border: 1px solid #4b5563;
+      border-radius: 10px;
+      padding: .6rem .7rem;
+      background: var(--panel-soft);
+      color: var(--text);
+    }
+
+    button {
+      cursor: pointer;
+      transition: transform .06s ease, background .2s ease;
+      font-weight: 600;
+    }
+
+    button:hover:not(:disabled) { transform: translateY(-1px); }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+
+    .primary { background: #1d4ed8; }
+    .secondary { background: #065f46; }
+    .danger { background: #7f1d1d; }
+
+    .status {
+      font-size: .95rem;
+      color: var(--muted);
+      min-height: 1.5rem;
+    }
+
+    .frames {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: .75rem;
+      max-height: 44vh;
+      overflow: auto;
+      padding-right: .25rem;
+    }
+
+    .thumb {
+      background: #111827;
+      border: 1px solid #374151;
+      border-radius: 10px;
+      padding: .4rem;
+    }
+
+    .thumb canvas {
+      width: 100%;
+      border-radius: 8px;
+      display: block;
+    }
+
+    .timeline {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      flex-wrap: wrap;
+    }
+
+    #previewCanvas {
+      width: min(100%, 900px);
+      border: 1px solid #4b5563;
+      border-radius: 10px;
+      background: #000;
+      display: block;
+      margin-top: .75rem;
+      aspect-ratio: 16 / 9;
+      object-fit: contain;
+    }
+
+    .footer-actions {
+      position: sticky;
+      bottom: 0;
+      display: flex;
+      gap: .75rem;
+      justify-content: flex-end;
+      background: linear-gradient(transparent, rgba(0, 0, 0, 0.55));
+      padding-top: .5rem;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="card">
+      <h1>Everyday Photo Stabilizer</h1>
+      <p>Upload your daily photos, auto align/stabilize them, and then generate a smooth timelapse video you can save.</p>
+      <div class="controls">
+        <label>
+          Photos
+          <input id="photosInput" type="file" accept="image/*" multiple />
+        </label>
+        <label>
+          Search Radius (px)
+          <input id="radiusInput" type="number" min="2" max="35" value="12" />
+        </label>
+        <label>
+          FPS
+          <input id="fpsInput" type="number" min="2" max="60" value="12" />
+        </label>
+        <button id="stabilizeBtn" class="primary">Stabilize & Align</button>
+      </div>
+      <p class="status" id="statusText">Choose at least 2 photos to begin.</p>
+    </section>
+
+    <section class="card">
+      <h2>Stabilized Frames</h2>
+      <div id="frames" class="frames"></div>
+    </section>
+
+    <section class="card">
+      <h2>Timelapse Creator</h2>
+      <div class="timeline">
+        <button id="playBtn">Preview Play</button>
+        <button id="stopBtn" class="danger">Stop</button>
+      </div>
+      <canvas id="previewCanvas" width="1280" height="720"></canvas>
+
+      <div class="footer-actions">
+        <button id="downloadFramesBtn">Download Stabilized Frames (ZIP)</button>
+        <button id="saveVideoBtn" class="secondary">Create & Save Timelapse (WEBM)</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script>
+    const photosInput = document.getElementById('photosInput');
+    const radiusInput = document.getElementById('radiusInput');
+    const fpsInput = document.getElementById('fpsInput');
+    const statusText = document.getElementById('statusText');
+    const stabilizeBtn = document.getElementById('stabilizeBtn');
+    const framesEl = document.getElementById('frames');
+    const previewCanvas = document.getElementById('previewCanvas');
+    const previewCtx = previewCanvas.getContext('2d');
+    const playBtn = document.getElementById('playBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const saveVideoBtn = document.getElementById('saveVideoBtn');
+    const downloadFramesBtn = document.getElementById('downloadFramesBtn');
+
+    let alignedFrames = [];
+    let playTimer = null;
+
+    const setStatus = (message, isError = false) => {
+      statusText.textContent = message;
+      statusText.style.color = isError ? 'var(--danger)' : 'var(--muted)';
+    };
+
+    const imageFromFile = (file) => new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error(`Failed to load ${file.name}`));
+        img.src = reader.result;
+      };
+      reader.onerror = () => reject(new Error(`Failed to read ${file.name}`));
+      reader.readAsDataURL(file);
+    });
+
+    const drawContain = (ctx, img, w, h, fill = '#000') => {
+      ctx.fillStyle = fill;
+      ctx.fillRect(0, 0, w, h);
+      const scale = Math.min(w / img.width, h / img.height);
+      const dw = img.width * scale;
+      const dh = img.height * scale;
+      const x = (w - dw) / 2;
+      const y = (h - dh) / 2;
+      ctx.drawImage(img, x, y, dw, dh);
+    };
+
+    const toGraySample = (canvas, sampleW = 200) => {
+      const scale = sampleW / canvas.width;
+      const sampleH = Math.max(20, Math.round(canvas.height * scale));
+      const tmp = document.createElement('canvas');
+      tmp.width = sampleW;
+      tmp.height = sampleH;
+      const tctx = tmp.getContext('2d', { willReadFrequently: true });
+      tctx.drawImage(canvas, 0, 0, sampleW, sampleH);
+      const rgba = tctx.getImageData(0, 0, sampleW, sampleH).data;
+      const gray = new Uint8ClampedArray(sampleW * sampleH);
+      for (let i = 0, p = 0; i < rgba.length; i += 4, p++) {
+        gray[p] = rgba[i] * 0.299 + rgba[i + 1] * 0.587 + rgba[i + 2] * 0.114;
+      }
+      return { gray, w: sampleW, h: sampleH };
+    };
+
+    const scoreOffset = (a, b, w, h, dx, dy) => {
+      const xStart = Math.max(0, dx);
+      const yStart = Math.max(0, dy);
+      const xEnd = Math.min(w, w + dx);
+      const yEnd = Math.min(h, h + dy);
+      if (xEnd - xStart < 20 || yEnd - yStart < 20) return Number.POSITIVE_INFINITY;
+
+      let total = 0;
+      let count = 0;
+      for (let y = yStart; y < yEnd; y += 2) {
+        const baseA = y * w;
+        const baseB = (y - dy) * w;
+        for (let x = xStart; x < xEnd; x += 2) {
+          total += Math.abs(a[baseA + x] - b[baseB + (x - dx)]);
+          count++;
+        }
+      }
+      return total / Math.max(1, count);
+    };
+
+    const findBestOffset = (refGray, curGray, w, h, radius) => {
+      let best = { dx: 0, dy: 0, score: Number.POSITIVE_INFINITY };
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          const score = scoreOffset(refGray, curGray, w, h, dx, dy);
+          if (score < best.score) best = { dx, dy, score };
+        }
+      }
+      return best;
+    };
+
+    const renderFrameThumbs = () => {
+      framesEl.innerHTML = '';
+      alignedFrames.forEach((frame, i) => {
+        const card = document.createElement('div');
+        card.className = 'thumb';
+        const label = document.createElement('small');
+        label.textContent = `#${i + 1} Δ(${frame.shiftX}, ${frame.shiftY})`;
+        const canvas = document.createElement('canvas');
+        canvas.width = frame.canvas.width;
+        canvas.height = frame.canvas.height;
+        canvas.getContext('2d').drawImage(frame.canvas, 0, 0);
+        card.appendChild(canvas);
+        card.appendChild(label);
+        framesEl.appendChild(card);
+      });
+    };
+
+    const previewFrame = (index) => {
+      if (!alignedFrames.length) return;
+      const frame = alignedFrames[index % alignedFrames.length];
+      previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+      drawContain(previewCtx, frame.canvas, previewCanvas.width, previewCanvas.height);
+    };
+
+    const stopPreview = () => {
+      if (playTimer) {
+        clearInterval(playTimer);
+        playTimer = null;
+      }
+    };
+
+    stabilizeBtn.addEventListener('click', async () => {
+      stopPreview();
+      alignedFrames = [];
+      framesEl.innerHTML = '';
+
+      const files = [...photosInput.files || []].sort((a, b) => a.name.localeCompare(b.name));
+      if (files.length < 2) {
+        setStatus('Please upload at least 2 photos.', true);
+        return;
+      }
+
+      const radius = Math.max(2, Math.min(35, Number(radiusInput.value) || 12));
+      stabilizeBtn.disabled = true;
+      setStatus(`Loading ${files.length} images...`);
+
+      try {
+        const images = [];
+        for (const file of files) images.push(await imageFromFile(file));
+
+        const baseW = 1280;
+        const baseH = 720;
+
+        const baseCanvas = document.createElement('canvas');
+        baseCanvas.width = baseW;
+        baseCanvas.height = baseH;
+        const baseCtx = baseCanvas.getContext('2d', { willReadFrequently: true });
+        drawContain(baseCtx, images[0], baseW, baseH);
+        const refSample = toGraySample(baseCanvas);
+        alignedFrames.push({ canvas: baseCanvas, shiftX: 0, shiftY: 0, name: files[0].name });
+
+        for (let i = 1; i < images.length; i++) {
+          setStatus(`Aligning frame ${i + 1}/${images.length}...`);
+
+          const raw = document.createElement('canvas');
+          raw.width = baseW;
+          raw.height = baseH;
+          const rawCtx = raw.getContext('2d', { willReadFrequently: true });
+          drawContain(rawCtx, images[i], baseW, baseH);
+
+          const sample = toGraySample(raw, refSample.w);
+          const best = findBestOffset(refSample.gray, sample.gray, sample.w, sample.h, radius);
+
+          const aligned = document.createElement('canvas');
+          aligned.width = baseW;
+          aligned.height = baseH;
+          const alignedCtx = aligned.getContext('2d');
+          alignedCtx.fillStyle = '#000';
+          alignedCtx.fillRect(0, 0, baseW, baseH);
+
+          const scaleX = baseW / sample.w;
+          const scaleY = baseH / sample.h;
+          const shiftX = Math.round(best.dx * scaleX);
+          const shiftY = Math.round(best.dy * scaleY);
+          alignedCtx.drawImage(raw, shiftX, shiftY);
+
+          alignedFrames.push({ canvas: aligned, shiftX, shiftY, name: files[i].name });
+        }
+
+        renderFrameThumbs();
+        previewFrame(0);
+        setStatus(`Done. ${alignedFrames.length} photos stabilized and ready for timelapse.`);
+      } catch (error) {
+        setStatus(error.message || 'Failed while stabilizing photos.', true);
+      } finally {
+        stabilizeBtn.disabled = false;
+      }
+    });
+
+    playBtn.addEventListener('click', () => {
+      if (!alignedFrames.length) {
+        setStatus('Stabilize photos first.', true);
+        return;
+      }
+      stopPreview();
+      const fps = Math.max(2, Math.min(60, Number(fpsInput.value) || 12));
+      let i = 0;
+      previewFrame(i);
+      playTimer = setInterval(() => previewFrame(++i), 1000 / fps);
+      setStatus('Previewing timelapse...');
+    });
+
+    stopBtn.addEventListener('click', () => {
+      stopPreview();
+      setStatus('Preview stopped.');
+    });
+
+    downloadFramesBtn.addEventListener('click', async () => {
+      if (!alignedFrames.length) {
+        setStatus('No stabilized photos to save yet.', true);
+        return;
+      }
+
+      try {
+        const zip = new JSZip();
+        const framesFolder = zip.folder('stabilized-frames');
+        for (let i = 0; i < alignedFrames.length; i++) {
+          const frame = alignedFrames[i];
+          const blob = await new Promise((resolve) => frame.canvas.toBlob(resolve, 'image/png', 0.92));
+          const safeName = (frame.name || `frame-${i + 1}`).replace(/\.[a-z]+$/i, '');
+          framesFolder.file(`${String(i + 1).padStart(4, '0')}-${safeName}.png`, blob);
+        }
+        const content = await zip.generateAsync({ type: 'blob' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(content);
+        a.download = 'stabilized-photos.zip';
+        a.click();
+        URL.revokeObjectURL(a.href);
+        setStatus('Stabilized frames ZIP downloaded.');
+      } catch (e) {
+        setStatus('Could not build ZIP file.', true);
+      }
+    });
+
+    saveVideoBtn.addEventListener('click', async () => {
+      if (!alignedFrames.length) {
+        setStatus('Stabilize photos before creating a timelapse.', true);
+        return;
+      }
+
+      const fps = Math.max(2, Math.min(60, Number(fpsInput.value) || 12));
+      const stream = previewCanvas.captureStream(fps);
+      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
+      const chunks = [];
+
+      recorder.ondataavailable = (event) => event.data.size && chunks.push(event.data);
+      recorder.start();
+
+      for (let i = 0; i < alignedFrames.length; i++) {
+        previewFrame(i);
+        await new Promise((r) => setTimeout(r, 1000 / fps));
+      }
+
+      recorder.stop();
+      recorder.onstop = () => {
+        const videoBlob = new Blob(chunks, { type: 'video/webm' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(videoBlob);
+        a.download = `timelapse-${Date.now()}.webm`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+        setStatus('Timelapse video saved.');
+      };
+    });
+  </script>
+</body>
+</html>
